@@ -2,9 +2,67 @@
 
 ## 1. System Design
 
+The three core actions a user should be able to perform in PawPal+ are:
+
+1. **Set up their pet profile** — Before any scheduling can happen, the user enters basic information about themselves and their pet: owner name, pet name, species, and how much time they have available in the day. This context shapes everything the scheduler does downstream.
+
+2. **Add and manage care tasks** — The user builds a list of tasks that need to happen (such as a morning walk, feeding, medication, or grooming). Each task has a title, an estimated duration in minutes, and a priority level (low, medium, or high). The user can add as many tasks as needed to reflect their pet's real care requirements.
+
+3. **Generate and view today's schedule** — Once tasks are entered, the user triggers the scheduler to produce an ordered daily plan. The plan fits tasks within the available time, ranks them by priority, and explains the reasoning behind each decision (for example, why a high-priority medication task was placed before a lower-priority enrichment activity).
+
+---
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+
+We are designing a pet care app with four core classes: **Owner** (holds the user's name and available time), **Pet** (holds the pet's name and species), **Task** (represents a single care activity with duration and priority), and **Scheduler** (takes the owner and task list and produces an ordered daily plan with reasoning).
+
+```mermaid
+classDiagram
+    class Owner {
+        +String name
+        +int available_minutes
+        +add_task(task)
+        +remove_task(task_title)
+    }
+
+    class Pet {
+        +String name
+        +String species
+        +Owner owner
+        +get_tasks()
+    }
+
+    class Task {
+        +String title
+        +int duration_minutes
+        +String priority
+        +is_feasible(remaining_minutes) bool
+    }
+
+    class Scheduler {
+        +Owner owner
+        +List~Task~ tasks
+        +generate_plan() Plan
+    }
+
+    class Plan {
+        +List~Task~ scheduled_tasks
+        +List~Task~ skipped_tasks
+        +int total_duration
+        +explain() str
+        +display()
+    }
+
+    Owner "1" --> "1" Pet : owns
+    Owner "1" --> "*" Task : has
+    Scheduler --> Owner : takes
+    Scheduler --> "*" Task : considers
+    Scheduler ..> Plan : produces
+    Plan --> "*" Task : contains
+```
+
 - What classes did you include, and what responsibilities did you assign to each?
 
 **b. Design changes**
