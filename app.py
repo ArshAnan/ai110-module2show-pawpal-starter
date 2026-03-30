@@ -4,9 +4,8 @@ from pawpal_system import Task, Pet, Owner, Scheduler
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 st.title("🐾 PawPal+")
 
-# --- Step 2: Session state "vault" ---
 # Streamlit reruns the script on every interaction.
-# We store the Owner object in session_state so it persists across reruns.
+# The Owner object lives in session_state so it persists across reruns.
 if "owner" not in st.session_state:
     st.session_state.owner = None
 
@@ -66,27 +65,40 @@ else:
             "Duration (minutes)", min_value=1, max_value=240, value=20
         )
         priority = st.selectbox("Priority", ["high", "medium", "low"])
+        start_time = st.text_input("Start time (HH:MM, optional)", value="")
+        frequency = st.selectbox("Frequency", ["once", "daily", "weekly"])
         add_task = st.form_submit_button("Add task")
 
         if add_task:
             selected_pet = next(p for p in owner.pets if p.name == selected_pet_name)
             selected_pet.add_task(
-                Task(title=task_title, duration_minutes=int(duration), priority=priority)
+                Task(
+                    title=task_title,
+                    duration_minutes=int(duration),
+                    priority=priority,
+                    start_time=start_time.strip() or None,
+                    frequency=frequency,
+                )
             )
             st.success(f"Added task '{task_title}' to {selected_pet_name}.")
 
-    # Show all tasks across all pets
+    # Show all tasks sorted by start time
     all_tasks = owner.get_all_tasks()
     if all_tasks:
-        st.write("**All current tasks:**")
+        scheduler = Scheduler(owner)
+        sorted_tasks = scheduler.sort_by_time(all_tasks)
+        st.write("**All tasks (sorted by start time):**")
         rows = [
             {
                 "Pet": next(p.name for p in owner.pets if t in p.tasks),
                 "Task": t.title,
+                "Start": t.start_time or "—",
                 "Duration (min)": t.duration_minutes,
                 "Priority": t.priority,
+                "Frequency": t.frequency,
+                "Done": "✅" if t.completed else "⬜",
             }
-            for t in all_tasks
+            for t in sorted_tasks
         ]
         st.table(rows)
     else:
@@ -102,13 +114,22 @@ if st.button("Generate schedule"):
         st.warning("Add at least one task before generating a schedule.")
     else:
         scheduler = Scheduler(owner)
+
+        # Conflict detection — shown before the plan
+        conflicts = scheduler.detect_conflicts()
+        if conflicts:
+            st.error("⚠️ Schedule conflicts detected — review before proceeding:")
+            for warning in conflicts:
+                st.warning(warning)
+
         plan = scheduler.generate_plan()
 
         st.subheader("Scheduled")
         if plan.scheduled_tasks:
             for task in plan.scheduled_tasks:
+                time_label = f" at {task.start_time}" if task.start_time else ""
                 st.success(
-                    f"**{task.title}** — {task.duration_minutes} min ({task.priority} priority)"
+                    f"**{task.title}**{time_label} — {task.duration_minutes} min ({task.priority} priority)"
                 )
         else:
             st.info("No tasks could be scheduled within your time budget.")
@@ -120,5 +141,6 @@ if st.button("Generate schedule"):
                     f"**{task.title}** — {task.duration_minutes} min — not enough time remaining"
                 )
 
-        st.metric("Total time used", f"{plan.total_duration} min")
-        st.metric("Time budget", f"{owner.available_minutes} min")
+        col1, col2 = st.columns(2)
+        col1.metric("Time used", f"{plan.total_duration} min")
+        col2.metric("Time budget", f"{owner.available_minutes} min")

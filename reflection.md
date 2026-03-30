@@ -23,28 +23,37 @@ classDiagram
     class Owner {
         +String name
         +int available_minutes
-        +add_task(task)
-        +remove_task(task_title)
+        +List~Pet~ pets
+        +add_pet(pet)
+        +get_all_tasks() List~Task~
     }
 
     class Pet {
         +String name
         +String species
-        +Owner owner
-        +get_tasks()
+        +List~Task~ tasks
+        +add_task(task)
+        +remove_task(task_title)
     }
 
     class Task {
         +String title
         +int duration_minutes
         +String priority
+        +bool completed
+        +String start_time
+        +String frequency
+        +Date due_date
         +is_feasible(remaining_minutes) bool
+        +mark_complete() Task
     }
 
     class Scheduler {
         +Owner owner
-        +List~Task~ tasks
         +generate_plan() Plan
+        +sort_by_time(tasks) List~Task~
+        +filter_tasks(pet_name, completed) List~Task~
+        +detect_conflicts() List~String~
     }
 
     class Plan {
@@ -55,10 +64,9 @@ classDiagram
         +display()
     }
 
-    Owner "1" --> "1" Pet : owns
-    Owner "1" --> "*" Task : has
-    Scheduler --> Owner : takes
-    Scheduler --> "*" Task : considers
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler --> Owner : reads
     Scheduler ..> Plan : produces
     Plan --> "*" Task : contains
 ```
@@ -86,8 +94,9 @@ These changes were made because the original design allowed inconsistency (two t
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler considers two constraints: **available time** (the owner's daily minute budget) and **task priority** (high / medium / low). Tasks are first sorted by priority, then greedily scheduled in that order — a task is added to the plan only if it fits within the remaining time. Any task that doesn't fit is skipped rather than rescheduled.
+
+Priority was chosen as the primary constraint because a pet owner's most urgent concern is making sure the most important tasks (medication, feeding) happen regardless of how busy the day is. Time was chosen as the secondary constraint because it's the most natural real-world limit — you can't do more than the day allows. Preferences like pet species or owner mood were intentionally left out of the first version to keep the logic simple and testable.
 
 **b. Tradeoffs**
 
@@ -101,13 +110,15 @@ This tradeoff is reasonable for a first version because it keeps the logic simpl
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+AI was used throughout every phase of the project. In the design phase it helped brainstorm which classes to create and what responsibilities each should hold. During implementation it generated method stubs and full logic for sorting, filtering, and conflict detection. In testing it suggested edge cases that hadn't been considered, such as an owner with no pets or zero available minutes.
+
+The most helpful prompts were specific and scoped: "Based on this skeleton, what relationships are missing?" or "Write a conflict detection method that returns warnings instead of raising exceptions." Broad prompts like "make it better" were less useful — the AI would add unnecessary complexity.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+The AI initially suggested keeping `tasks` as a flat list on `Owner` rather than distributing them across `Pet` objects. This would have made filtering by pet impossible without storing extra metadata on every task. The suggestion was rejected because the instruction explicitly asked for a multi-pet system where each pet owns its tasks. The decision was verified by writing `test_filter_tasks_by_pet_name()` — if tasks lived on `Owner`, that test structure would have been awkward and the filter logic would have needed a pet-name field on `Task` instead, which is a design smell.
+
+AI was also used to generate the initial test suite, but each test was read and verified manually before keeping it. Two generated tests were rewritten because they tested implementation details (internal list length) rather than observable behavior.
 
 ---
 
@@ -115,13 +126,13 @@ This tradeoff is reasonable for a first version because it keeps the logic simpl
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+The test suite covers 17 behaviors: task completion status, adding and removing tasks from pets, priority-based scheduling, time-budget enforcement, chronological sorting, filtering by pet name and completion status, daily and weekly recurrence, conflict detection for overlapping and non-overlapping windows, and edge cases like an owner with no pets, a pet with no tasks, and a zero-minute time budget.
+
+These tests are important because the scheduler's core promise — "high-priority tasks always go first, nothing runs over budget" — must hold even when the input data is messy or incomplete. Without tests for edge cases, a bug in the greedy scheduling loop or the recurrence logic would only surface during a live demo.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+**★★★★☆** — The core scheduling logic and all algorithmic features are thoroughly tested. The main untested areas are the Streamlit UI (interactions can't be automated without a browser testing framework) and scenarios where two pets share tasks with conflicting times across pets. Given more time, the next tests would cover: recurring tasks where `due_date` is `None`, the `filter_tasks` method with both `pet_name` and `completed` specified simultaneously, and a full end-to-end integration test building owner → pets → tasks → plan in one pass.
 
 ---
 
@@ -129,12 +140,12 @@ This tradeoff is reasonable for a first version because it keeps the logic simpl
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+The most satisfying part was the algorithmic layer — particularly conflict detection and recurring tasks. Both required thinking carefully about edge cases (what if no tasks have a start time? what if `due_date` is None?) before writing a single line. Using tests to verify each behavior before wiring it to the UI meant the Streamlit integration was mostly painless; the logic was already proven to work.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+The biggest redesign candidate is how recurring tasks work. Currently `mark_complete()` returns a new `Task` object, but the caller (the UI or `main.py`) is responsible for adding it back to the correct pet. This is easy to forget and there's no test for that integration. In a next iteration, the `Pet` class would handle this automatically — when a task is completed, `Pet` would check if it's recurring and append the next occurrence itself, keeping the responsibility close to the data.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+The most important lesson was that AI is a fast first-draft generator, not a system designer. It can produce working code quickly, but it doesn't know your constraints — it didn't know that tasks needed to live on `Pet` rather than `Owner`, or that conflict detection should warn rather than crash. Every meaningful architectural decision required a human to define the requirement first, then use AI to implement it. The lead architect role isn't optional when working with AI tools; it's the only role that actually matters.
