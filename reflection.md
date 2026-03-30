@@ -91,8 +91,9 @@ These changes were made because the original design allowed inconsistency (two t
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The conflict detector only flags tasks whose time windows *exactly overlap* based on their `start_time` and `duration_minutes`. It does not account for travel time between tasks, preparation time, or tasks without a `start_time` set. This means two tasks scheduled back-to-back at 08:00 (20 min) and 08:20 (10 min) are considered conflict-free even if a real owner would need a buffer between them.
+
+This tradeoff is reasonable for a first version because it keeps the logic simple and predictable — it surfaces genuine double-bookings (the most common mistake) without requiring the owner to model every minute of their day. Adding buffer-time logic would require the owner to specify travel/prep times per task, which adds friction to the UI and complexity to the scheduler. For a pet care app used by a single owner at home, exact-overlap detection covers the most important case.
 
 ---
 

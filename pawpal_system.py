@@ -1,6 +1,14 @@
 from dataclasses import dataclass, field
+from datetime import date, timedelta
+from typing import Optional
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def _time_to_minutes(t: str) -> int:
+    """Convert a 'HH:MM' string to total minutes since midnight."""
+    h, m = t.split(":")
+    return int(h) * 60 + int(m)
 
 
 @dataclass
@@ -11,14 +19,36 @@ class Task:
     duration_minutes: int
     priority: str  # "low", "medium", "high"
     completed: bool = False
+    start_time: Optional[str] = None  # "HH:MM" format
+    frequency: str = "once"  # "once", "daily", "weekly"
+    due_date: Optional[date] = None
 
     def is_feasible(self, remaining_minutes: int) -> bool:
         """Return True if this task fits within the remaining available time."""
         return self.duration_minutes <= remaining_minutes
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self) -> Optional["Task"]:
+        """Mark this task as completed and return the next occurrence if recurring, else None."""
         self.completed = True
+        if self.frequency == "daily" and self.due_date:
+            return Task(
+                title=self.title,
+                duration_minutes=self.duration_minutes,
+                priority=self.priority,
+                frequency=self.frequency,
+                due_date=self.due_date + timedelta(days=1),
+                start_time=self.start_time,
+            )
+        if self.frequency == "weekly" and self.due_date:
+            return Task(
+                title=self.title,
+                duration_minutes=self.duration_minutes,
+                priority=self.priority,
+                frequency=self.frequency,
+                due_date=self.due_date + timedelta(weeks=1),
+                start_time=self.start_time,
+            )
+        return None
 
 
 @dataclass
@@ -84,6 +114,43 @@ class Scheduler:
 
         total_duration = self.owner.available_minutes - remaining
         return Plan(scheduled, skipped, total_duration)
+
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Sort tasks by start_time (HH:MM). Tasks without a start_time sort last."""
+        return sorted(tasks, key=lambda t: t.start_time or "99:99")
+
+    def filter_tasks(
+        self,
+        pet_name: Optional[str] = None,
+        completed: Optional[bool] = None,
+    ) -> list[Task]:
+        """Filter tasks by pet name and/or completion status. Omit a parameter to skip that filter."""
+        results = []
+        for pet in self.owner.pets:
+            if pet_name and pet.name != pet_name:
+                continue
+            for task in pet.tasks:
+                if completed is not None and task.completed != completed:
+                    continue
+                results.append(task)
+        return results
+
+    def detect_conflicts(self) -> list[str]:
+        """Return warning messages for any tasks whose time windows overlap."""
+        timed_tasks = [t for t in self.owner.get_all_tasks() if t.start_time]
+        warnings = []
+        for i, a in enumerate(timed_tasks):
+            for b in timed_tasks[i + 1:]:
+                a_start = _time_to_minutes(a.start_time)
+                a_end = a_start + a.duration_minutes
+                b_start = _time_to_minutes(b.start_time)
+                b_end = b_start + b.duration_minutes
+                if a_start < b_end and b_start < a_end:
+                    warnings.append(
+                        f"CONFLICT: '{a.title}' ({a.start_time}, {a.duration_minutes} min) "
+                        f"overlaps with '{b.title}' ({b.start_time}, {b.duration_minutes} min)"
+                    )
+        return warnings
 
 
 class Plan:
