@@ -50,3 +50,26 @@ PawPal+ includes algorithmic features beyond basic priority sorting:
 - **Filter tasks** — `Scheduler.filter_tasks()` returns tasks matching a pet name, completion status, or both.
 - **Recurring tasks** — Tasks can have a `frequency` of `"daily"` or `"weekly"`. Calling `mark_complete()` on a recurring task returns a new `Task` instance due on the next occurrence (`due_date + 1 day` or `+ 7 days`).
 - **Conflict detection** — `Scheduler.detect_conflicts()` scans all timed tasks and returns warning messages for any pair whose time windows overlap, without crashing the program.
+
+## Testing PawPal+
+
+Run the full test suite with:
+
+```bash
+python -m pytest
+```
+
+The suite covers 17 test cases across these areas:
+
+| Area | What's tested |
+|---|---|
+| Task basics | `mark_complete()` changes status; `add_task()` / `remove_task()` work correctly |
+| Scheduler | Tasks sorted by priority; tasks that don't fit are skipped |
+| Sorting | `sort_by_time()` returns chronological order; untimed tasks sort last |
+| Filtering | Filter by pet name; filter by completion status |
+| Recurring tasks | Daily tasks spawn next occurrence (+1 day); weekly tasks spawn next (+7 days); one-time tasks return `None` |
+| Conflict detection | Overlapping time windows flagged; back-to-back and untimed tasks are not flagged |
+| Edge cases | Owner with no pets; pet with no tasks; zero available minutes; no start times set |
+
+**Confidence level: ★★★★☆**
+Core scheduling logic and algorithmic features are well covered. The main gap is UI-level testing (Streamlit interactions are not automated) and integration tests across the full owner → pet → task → plan flow with multiple pets simultaneously.

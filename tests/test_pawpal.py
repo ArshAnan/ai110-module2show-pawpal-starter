@@ -125,3 +125,60 @@ def test_detect_conflicts_no_overlap():
 
     warnings = Scheduler(owner).detect_conflicts()
     assert len(warnings) == 0
+
+
+# --- Edge cases ---
+
+def test_owner_with_no_pets_produces_empty_plan():
+    owner = Owner(name="Jordan", available_minutes=60)
+    plan = Scheduler(owner).generate_plan()
+    assert plan.scheduled_tasks == []
+    assert plan.skipped_tasks == []
+    assert plan.total_duration == 0
+
+
+def test_pet_with_no_tasks_does_not_crash_scheduler():
+    owner = Owner(name="Jordan", available_minutes=60)
+    owner.add_pet(Pet(name="Mochi", species="dog"))
+    plan = Scheduler(owner).generate_plan()
+    assert plan.scheduled_tasks == []
+
+
+def test_zero_available_minutes_skips_all_tasks():
+    owner = Owner(name="Jordan", available_minutes=0)
+    pet = Pet(name="Mochi", species="dog")
+    pet.add_task(Task(title="Walk", duration_minutes=20, priority="high"))
+    owner.add_pet(pet)
+
+    plan = Scheduler(owner).generate_plan()
+    assert plan.scheduled_tasks == []
+    assert len(plan.skipped_tasks) == 1
+
+
+def test_remove_task_removes_correct_task():
+    pet = Pet(name="Mochi", species="dog")
+    pet.add_task(Task(title="Walk", duration_minutes=20, priority="high"))
+    pet.add_task(Task(title="Feed", duration_minutes=5, priority="medium"))
+    pet.remove_task("Walk")
+    assert len(pet.tasks) == 1
+    assert pet.tasks[0].title == "Feed"
+
+
+def test_recurring_weekly_task_spawns_next_occurrence():
+    today = date.today()
+    task = Task(title="Bath", duration_minutes=30, priority="low", frequency="weekly", due_date=today)
+    next_task = task.mark_complete()
+    assert next_task is not None
+    assert next_task.due_date == today + timedelta(weeks=1)
+    assert next_task.completed is False
+
+
+def test_no_conflicts_when_no_tasks_have_start_time():
+    owner = Owner(name="Jordan", available_minutes=60)
+    pet = Pet(name="Mochi", species="dog")
+    pet.add_task(Task(title="Walk", duration_minutes=20, priority="high"))
+    pet.add_task(Task(title="Feed", duration_minutes=5, priority="high"))
+    owner.add_pet(pet)
+
+    warnings = Scheduler(owner).detect_conflicts()
+    assert warnings == []
