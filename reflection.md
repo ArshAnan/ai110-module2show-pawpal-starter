@@ -65,7 +65,17 @@ classDiagram
 
 - What classes did you include, and what responsibilities did you assign to each?
 
+The initial design includes five classes. **Task** (dataclass) holds a single care activity — its title, duration in minutes, and priority — and can check whether it fits within remaining time. **Pet** (dataclass) stores the pet's name and species and holds a reference back to its owner. **Owner** is the central hub: it stores the owner's name, available time for the day, and the full list of tasks to be completed. **Scheduler** takes an owner and their tasks and runs the scheduling algorithm, returning a **Plan**. **Plan** holds the result: which tasks were scheduled, which were skipped, the total duration used, and methods to explain and display the outcome.
+
 **b. Design changes**
+
+After reviewing the skeleton, two issues were identified and one change was made:
+
+1. **`Scheduler` no longer takes a separate `tasks` argument** — tasks are already stored on `Owner.tasks`, so passing them in separately created two sources of truth. The `Scheduler` now reads `owner.tasks` directly, removing the redundancy.
+
+2. **`Pet.get_tasks()` was removed** — `Pet` had no task list of its own and its `owner` reference was optional, so the method had nowhere to look. Tasks belong to `Owner`, not `Pet`, so this method was misleading. It was dropped to keep responsibilities clear.
+
+These changes were made because the original design allowed inconsistency (two task lists) and included a method that could never work correctly without a fragile back-reference chain.
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.

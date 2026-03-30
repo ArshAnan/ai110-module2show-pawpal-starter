@@ -18,9 +18,6 @@ class Pet:
     species: str  # "dog", "cat", "other"
     owner: Optional["Owner"] = None
 
-    def get_tasks(self) -> list["Task"]:
-        pass
-
 
 class Owner:
     def __init__(self, name: str, available_minutes: int):
@@ -37,9 +34,8 @@ class Owner:
 
 
 class Scheduler:
-    def __init__(self, owner: Owner, tasks: list[Task]):
+    def __init__(self, owner: Owner):
         self.owner = owner
-        self.tasks = tasks
 
     def generate_plan(self) -> "Plan":
         pass
